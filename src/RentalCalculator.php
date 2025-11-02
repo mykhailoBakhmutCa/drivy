@@ -35,13 +35,48 @@ class RentalCalculator
                 $deductibleReductionFee = $days * 400;
             }
 
+            [
+                'total_commission' => $totalCommission,
+                'insurance_fee' => $insuranceFee,
+                'assistance_fee' => $assistanceFee,
+                'drivy_fee' => $drivyFee,
+            ] = $commissionData;
+
+            $driverDebit = $totalPrice + $deductibleReductionFee;
+
+            $ownerCredit = $totalPrice - $totalCommission;
+
+            $drivyCredit = $drivyFee + $deductibleReductionFee;
+
             $outputRentals[] = [
                 'id' => $rental['id'],
-                'price' => $totalPrice,
-                'options' => [
-                    'deductible_reduction' => $deductibleReductionFee
+                'actions' => [
+                    [
+                        'who' => 'driver',
+                        'type' => 'debit',
+                        'amount' => $driverDebit,
+                    ],
+                    [
+                        'who' => 'owner',
+                        'type' => 'credit',
+                        'amount' => $ownerCredit,
+                    ],
+                    [
+                        'who' => 'insurance',
+                        'type' => 'credit',
+                        'amount' => $insuranceFee,
+                    ],
+                    [
+                        'who' => 'assistance',
+                        'type' => 'credit',
+                        'amount' => $assistanceFee,
+                    ],
+                    [
+                        'who' => 'drivy',
+                        'type' => 'credit',
+                        'amount' => $drivyCredit,
+                    ]
                 ],
-                'commission' => $commissionData,
             ];
         }
 
@@ -77,6 +112,7 @@ class RentalCalculator
         $drivyFee = $totalCommission - $assistanceFee - $insuranceFee;
 
         return [
+            'total_commission' => $totalCommission,
             'insurance_fee' => $insuranceFee,
             'assistance_fee' => $assistanceFee,
             'drivy_fee' => $drivyFee,
