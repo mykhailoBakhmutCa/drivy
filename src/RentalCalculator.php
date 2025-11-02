@@ -28,9 +28,12 @@ class RentalCalculator
 
             $totalPrice = $timePrice + $distancePrice;
 
+            $commissionData = $this->calculateCommission($totalPrice, $days);
+
             $outputRentals[] = [
                 'id' => $rental['id'],
                 'price' => $totalPrice,
+                'commission' => $commissionData,
             ];
         }
 
@@ -53,5 +56,22 @@ class RentalCalculator
         }
 
         return (int)$totalPrice;
+    }
+
+    private function calculateCommission(int $totalPrice, int $days): array
+    {
+        $totalCommission = (int)($totalPrice * 0.3);
+
+        $insuranceFee = (int)($totalCommission * 0.5);
+
+        $assistanceFee = (int)($days * 100);
+
+        $drivyFee = $totalCommission - $assistanceFee - $insuranceFee;
+
+        return [
+            'insurance_fee' => $insuranceFee,
+            'assistance_fee' => $assistanceFee,
+            'drivy_fee' => $drivyFee,
+        ];
     }
 }
