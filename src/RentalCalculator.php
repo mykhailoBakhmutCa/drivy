@@ -30,9 +30,17 @@ class RentalCalculator
 
             $commissionData = $this->calculateCommission($totalPrice, $days);
 
+            $deductibleReductionFee = 0;
+            if ($rental['deductible_reduction']) {
+                $deductibleReductionFee = $days * 400;
+            }
+
             $outputRentals[] = [
                 'id' => $rental['id'],
                 'price' => $totalPrice,
+                'options' => [
+                    'deductible_reduction' => $deductibleReductionFee
+                ],
                 'commission' => $commissionData,
             ];
         }
