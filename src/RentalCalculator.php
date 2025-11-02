@@ -12,75 +12,59 @@ class RentalCalculator
             $carMap[$car['id']] = $car;
         }
 
-        $outputRentals = [];
-
+        $rentalMap = [];
         foreach ($data['rentals'] as $rental) {
+            $rentalMap[$rental['id']] = $rental;
+        }
 
-            $car = $carMap[$rental['car_id']];
+        $outputModifications = [];
 
-            $startDate = new \DateTime($rental['start_date']);
-            $endDate = new \DateTime($rental['end_date']);
+        foreach ($data['rental_modifications'] as $modification) {
 
-            $days = $startDate->diff($endDate)->days + 1;
+            $originalRental = $rentalMap[$modification['rental_id']];
+            $car = $carMap[$originalRental['car_id']];
 
-            $timePrice = $this->calculateTimePrice($days, $car['price_per_day']);
-            $distancePrice = $rental['distance'] * $car['price_per_km'];
+            $amountBefore = $this->getRentalAmounts($originalRental, $car);
 
-            $totalPrice = $timePrice + $distancePrice;
+            $modifiedRental = array_merge($originalRental, $modification);
 
-            $commissionData = $this->calculateCommission($totalPrice, $days);
+            $amountAfter = $this->getRentalAmounts($modifiedRental, $car);
 
-            $deductibleReductionFee = 0;
-            if ($rental['deductible_reduction']) {
-                $deductibleReductionFee = $days * 400;
+            $actions = [];
+
+            $actors = ['driver', 'owner', 'insurance', 'assistance', 'drivy'];
+
+            foreach ($actors as $actor) {
+                $delta = $amountAfter[$actor] - $amountBefore[$actor];
+
+                if ($delta === 0) {
+                    continue;
+                }
+
+                if ($actor === 'driver') {
+                    // debit - driver pay more
+                    $type = ($delta > 0) ? 'debit' : 'credit';
+                } else {
+                    // credit - company receive more
+                    $type = ($delta > 0) ? 'credit' : 'debit';
+                }
+
+                $actions[] = [
+                    'who' => $actor,
+                    'type' => $type,
+                    'amount' => abs($delta),
+                ];
             }
 
-            [
-                'total_commission' => $totalCommission,
-                'insurance_fee' => $insuranceFee,
-                'assistance_fee' => $assistanceFee,
-                'drivy_fee' => $drivyFee,
-            ] = $commissionData;
-
-            $driverDebit = $totalPrice + $deductibleReductionFee;
-
-            $ownerCredit = $totalPrice - $totalCommission;
-
-            $drivyCredit = $drivyFee + $deductibleReductionFee;
-
-            $outputRentals[] = [
-                'id' => $rental['id'],
-                'actions' => [
-                    [
-                        'who' => 'driver',
-                        'type' => 'debit',
-                        'amount' => $driverDebit,
-                    ],
-                    [
-                        'who' => 'owner',
-                        'type' => 'credit',
-                        'amount' => $ownerCredit,
-                    ],
-                    [
-                        'who' => 'insurance',
-                        'type' => 'credit',
-                        'amount' => $insuranceFee,
-                    ],
-                    [
-                        'who' => 'assistance',
-                        'type' => 'credit',
-                        'amount' => $assistanceFee,
-                    ],
-                    [
-                        'who' => 'drivy',
-                        'type' => 'credit',
-                        'amount' => $drivyCredit,
-                    ]
-                ],
+            $outputModifications[] = [
+                'id' => $modification['id'],
+                'rental_id' => $modification['rental_id'],
+                'actions' => $actions,
             ];
         }
 
-        return ['rentals' => $outputRentals];
+
+        return ['rentals' => $outputModifications];
     }
 
     private function calculateTimePrice(int $days, int $pricePerDay): int
@@ -116,6 +100,51 @@ class RentalCalculator
             'insurance_fee' => $insuranceFee,
             'assistance_fee' => $assistanceFee,
             'drivy_fee' => $drivyFee,
+        ];
+    }
+
+    private function getRentalAmounts(array $rental, array $car): array
+    {
+        $startDate = new \DateTime($rental['start_date']);
+        $endDate = new \DateTime($rental['end_date']);
+
+        $days = $startDate->diff($endDate)->days + 1;
+
+        $timePrice = $this->calculateTimePrice($days, $car['price_per_day']);
+        $distancePrice = $rental['distance'] * $car['price_per_km'];
+
+        $totalPrice = $timePrice + $distancePrice;
+
+        $commissionData = $this->calculateCommission($totalPrice, $days);
+
+        [
+            'total_commission' => $totalCommission,
+            'insurance_fee' => $insuranceFee,
+            'assistance_fee' => $assistanceFee,
+            'drivy_fee' => $drivyFee,
+        ] = $commissionData;
+
+        $deductibleReductionFee = 0;
+        if ($rental['deductible_reduction']) {
+            $deductibleReductionFee = $days * 400;
+        }
+
+        $driverAmount = $totalPrice + $deductibleReductionFee;
+
+        $ownerAmount = $totalPrice - $totalCommission;
+
+        $insuranceAmount = $insuranceFee;
+
+        $assistanceAmount = $assistanceFee;
+
+        $drivyAmount = $drivyFee + $deductibleReductionFee;
+
+        return [
+            'driver' => $driverAmount,
+            'owner' => $ownerAmount,
+            'insurance' => $insuranceAmount,
+            'assistance' => $assistanceAmount,
+            'drivy' => $drivyAmount,
         ];
     }
 }
